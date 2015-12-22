@@ -4,8 +4,14 @@ slack-pixiv-new-works-bot
 ## Requirements
 
 - Python >= 3.4
-- pixivpy (pip)
-- slacker (pip)
+- PixivPy == 3.1.0 (pip)
+- slacker == 0.8.6 (pip)
+
+## Install
+
+```bash
+$ pip install -r requirements_packages.txt
+```
 
 ## Usage
 
