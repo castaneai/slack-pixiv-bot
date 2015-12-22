@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import time
 import base64
 from slacker import Slacker
@@ -38,7 +39,7 @@ def post_to_slack(slack, channel, pixiv_work):
     slack.chat.post_message(channel, "", as_user=True, attachments=[pixiv_work_to_slack_attachment(pixiv_work)])
 
 
-def run(polling_interval=60):
+def run(slack_channel, polling_interval):
     username = bytes(os.environ["PIXIV_BOT_USERNAME"], encoding="utf8")
     password = base64.b64decode(bytes(os.environ["PIXIV_BOT_PASSWORD"], encoding="utf8"))
     pixiv = Pixiv(username=username, password=password)
@@ -49,14 +50,19 @@ def run(polling_interval=60):
         new_works = list(pixiv.following_works_since(last_got_work_id.read(), limit=5))
         for work in reversed(new_works):
             print("[{}]{}: {} by {}".format(work["created_time"], work["id"], work["title"], work["user"]["name"]))
-            post_to_slack(slack, "#pixiv_test", pixiv_work_to_slack_attachment(work))
+            post_to_slack(slack, slack_channel, pixiv_work_to_slack_attachment(work))
             last_got_work_id.write(work["id"])
         time.sleep(polling_interval)
 
 
 if __name__ == "__main__":
     try:
-        run()
+        if len(sys.argv) != 3:
+            print("Usage: bot.py <slack_channel_name> <polling_interval_seconds>")
+            exit()
+        slack_channel_name = "#" + sys.argv[1]
+        polling_interval_seconds = int(sys.argv[2])
+        run(slack_channel_name, polling_interval_seconds)
     except KeyboardInterrupt:
         pass
     finally:
