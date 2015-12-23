@@ -1,6 +1,7 @@
 {
   "name": "slack-pixiv-new-works-bot",
   "description": "A Slack bot posting new works by following users.",
+  "keywords": ["python", "slack", "pixiv"],
   "env": {
     "PIXIV_BOT_USERNAME": {
       "description": "pixiv login username",

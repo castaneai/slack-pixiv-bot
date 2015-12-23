@@ -10,7 +10,7 @@ slack-pixiv-new-works-bot
 ## Install
 
 ```bash
-$ pip install -r requirements_packages.txt
+$ pip install -r requirements.txt
 ```
 
 ## Usage
