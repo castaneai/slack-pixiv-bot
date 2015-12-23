@@ -1,5 +1,6 @@
-slack-pixiv-new-works-bot
-==========================
+slack-pixiv-bot
+==================
+A Slack bot to post new works by following users.
 
 ## Requirements
 
