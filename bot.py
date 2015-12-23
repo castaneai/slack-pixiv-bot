@@ -50,7 +50,7 @@ def run(slack_channel, polling_interval):
         new_works = list(pixiv.following_works_since(last_got_work_id.read(), limit=5))
         for work in reversed(new_works):
             print("[{}]{}: {} by {}".format(work["created_time"], work["id"], work["title"], work["user"]["name"]))
-            post_to_slack(slack, slack_channel, pixiv_work_to_slack_attachment(work))
+            post_to_slack(slack, slack_channel, work)
             last_got_work_id.write(work["id"])
         time.sleep(polling_interval)
 
