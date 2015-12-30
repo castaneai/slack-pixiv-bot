@@ -1,1 +1,1 @@
-worker: python bot.py general 60
+worker: python bot.py pixiv_test 60
