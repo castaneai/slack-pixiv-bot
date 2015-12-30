@@ -15,7 +15,7 @@ class LastGotWorkIdMemory:
 
     def read(self):
         for m in self._slack.channels.history(self._channel_id, count=10).body["messages"]:
-            if len(m["attachments"]) > 0 and len(m["attachments"][0]["fields"]) > 0:
+            if len(m["attachments"]) > 0 and "fields" in m["attachments"][0] and len(m["attachments"][0]["fields"]) > 0:
                 return int(m["attachments"][0]["fields"][0]["value"])
         return 0
 
