@@ -3,81 +3,103 @@ import os
 import sys
 import time
 import base64
-from slacker import Slacker
-from pixiv import Pixiv
-
-
-class LastGotWorkIdMemory:
-
-    def __init__(self, slack: Slacker, channel_id: str):
-        self._slack = slack
-        self._channel_id = channel_id
-
-    def read(self):
-        for m in self._slack.channels.history(self._channel_id, count=10).body["messages"]:
-            if len(m["attachments"]) > 0 and "fields" in m["attachments"][0] and len(m["attachments"][0]["fields"]) > 0:
-                return int(m["attachments"][0]["fields"][0]["value"])
-        return 0
+import itertools
+import requests
+import pixivpy3
 
 
 class Bot:
 
-    def __init__(self, slack_api_token: str, slack_channel_name: str, pixiv_username: str, pixiv_password: str):
-        self._slack = Slacker(slack_api_token)
-        self._slack.auth.test()
-        self._slack_channel_id = self._get_channel_id(slack_channel_name.lstrip("#"))
-        self._pixiv = Pixiv(username=pixiv_username, password=pixiv_password)
-        self._last_got_work_id = LastGotWorkIdMemory(self._slack, self._slack_channel_id)
+    def __init__(self, slack_incoming_hook_url, pixiv_username, pixiv_password, polling_seconds):
+        self._slack_incoming_hook_url = slack_incoming_hook_url
+        self._pixiv_api = pixivpy3.PixivAPI()
+        self._pixiv_api.login(pixiv_username, pixiv_password)
+        self._polling_seconds = polling_seconds
+        self._last_fetched_post_id = 0
 
-    def run(self):
-        since_work_id = self._last_got_work_id.read()
-        new_works = list(self._pixiv.following_works_since(since_work_id, limit=10))
-        for work in reversed(new_works):
-            print("[{}]{}: {} by {}".format(work["created_time"], work["id"], work["title"], work["user"]["name"]))
-            self._post_pixiv_work(work)
+    def run_forever(self):
+        self._last_fetched_post_id = self.fetch_least_post_id()
+        while True:
+            new_posts = self.fetch_new_posts()
+            self.notify_posts_to_slack(new_posts)
+            time.sleep(self._polling_seconds)
 
-    def _get_channel_id(self, channel_name: str):
-        channels_dict = {c["name"]: c for c in self._slack.channels.list().body["channels"]}
-        if channel_name in channels_dict:
-            return channels_dict[channel_name]["id"]
-        raise RuntimeError("Slack channel: #{} not found.".format(channel_name))
+    def fetch_least_post_id(self):
+        """
+        最新の投稿のIDを取得
+        このIDより新しいものを次の取得時の新着投稿とする
+        """
+        api_result = self._pixiv_api.me_following_works(page=1, per_page=1, include_stats=False, include_sanity_level=False)
+        if api_result["status"] != "success":
+            raise RuntimeError("[pixiv API]me_following_works failed. {0}".format(api_result))
+        if len(api_result["response"]) < 1:
+            raise RuntimeError("[pixiv API]me_following_works result count 0...")
+        return int(api_result["response"][0]["id"])
 
-    def _post_pixiv_work(self, work):
-        self._slack.chat.post_message(self._slack_channel_id, "", as_user=True,
-                                      attachments=[self._pixiv_work_to_slack_attachment(work)])
+    def fetch_new_posts(self):
+        """
+        pixivからフォローしたユーザーの新着投稿一覧を返す
+        """
+        new_posts = list(itertools.takewhile(self.is_new_post, self.fetch_posts()))
+        if len(new_posts) > 0:
+            self._last_fetched_post_id = int(new_posts[0]["id"])
+        return reversed(new_posts)
+
+    def is_new_post(self, post):
+        """
+        投稿が新しいものかどうか返す
+        """
+        return post is not None and post["id"] > 0 and post["id"] != self._last_fetched_post_id
+
+    def fetch_posts(self):
+        """
+        pixivからフォロー新着の投稿一覧を取得
+        """
+        api_result = self._pixiv_api.me_following_works(include_stats=False, include_sanity_level=False)
+        if api_result["status"] != "success":
+            raise RuntimeError("[pixiv API]me_following_works failed. {0}".format(api_result))
+        return api_result["response"]
+
+    def notify_posts_to_slack(self, posts):
+        """
+        pixivの投稿リストをslackに通知する
+        """
+        for post in posts:
+            requests.post(self._slack_incoming_hook_url, json=self.pixiv_post_to_slack_message(post))
 
     @staticmethod
-    def _pixiv_work_to_slack_attachment(work):
+    def pixiv_post_to_slack_message(post):
+        """
+        pixivの投稿をSlackのメッセージに変換
+        """
+        attachment = {
+            "fallback": "[pixiv]{}".format(post["title"]),
+            "color": "#4385B7",  # pixivカラーの青
+            "title": post["title"],
+            "title_link": "http://www.pixiv.net/member_illust.php?mode=medium&illust_id={}".format(post["id"]),
+            "image_url": post["image_urls"]["px_128x128"],
+            "text": "",
+        }
         return {
-            "fallback": "[pixiv]New following work: {}".format(work["title"]),
-            "color": "#4385B7",
-            "title": work["title"],
-            "title_link": "http://www.pixiv.net/member_illust.php?mode=medium&illust_id={}".format(work["id"]),
-            "image_url": work["image_urls"]["px_128x128"],
-            "author_name": work["user"]["name"],
-            "author_icon": work["user"]["profile_image_urls"]["px_50x50"],
-            "text": work["caption"],
-            "fields": [{"title": "work_id", "value": work["id"]}],
+            "username": post["user"]["name"],
+            "icon_url": "http://winapp.jp/wp/wp-content/uploads/2012/11/pixiv-icon.png",
+            "text": "",
+            "attachments": [attachment],
         }
 
 
 def run(args):
-    slack_api_token = os.environ["PIXIV_BOT_SLACK_API_TOKEN"]
-    slack_channel_name = args[0]
+    slack_incoming_hook_url = os.environ["PIXIV_BOT_SLACK_INCOMING_HOOK_URL"]
     pixiv_username = os.environ["PIXIV_BOT_USERNAME"]
     pixiv_password = base64.b64decode(bytes(os.environ["PIXIV_BOT_PASSWORD"], encoding="utf8"))
-    polling_interval_seconds = int(args[1])
-
-    bot = Bot(slack_api_token, slack_channel_name, pixiv_username, pixiv_password)
-    while True:
-        bot.run()
-        time.sleep(polling_interval_seconds)
-
+    polling_seconds = int(args[0])
+    bot = Bot(slack_incoming_hook_url, pixiv_username, pixiv_password, polling_seconds)
+    bot.run_forever()
 
 if __name__ == "__main__":
     try:
-        if len(sys.argv) != 3:
-            print("Usage: bot.py <slack_channel_name> <polling_interval_seconds>")
+        if len(sys.argv) != 2:
+            print("Usage: bot.py <polling_interval_seconds>")
             exit()
         run(sys.argv[1:])
     except KeyboardInterrupt:

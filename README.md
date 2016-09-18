@@ -5,8 +5,8 @@ A Slack bot to post new works by following users.
 ## Requirements
 
 - Python >= 3.4
+- requests == 2.11.1 (pip)
 - PixivPy == 3.1.0 (pip)
-- slacker == 0.8.6 (pip)
 
 ## Install
 
@@ -14,13 +14,12 @@ A Slack bot to post new works by following users.
 $ pip install -r requirements.txt
 ```
 
-## Usage
-
-- Post new works to slack channel `#general` per 60s.
+## Usage example
+Post new works to slack per 60s.
 
 ```bash
-$ export PIXIV_BOT_SLACK_API_TOKEN=<slack api token here>
+$ export PIXIV_BOT_SLACK_INCOMING_HOOK_URL=<slack incoming webhook url here>
 $ export PIXIV_BOT_USERNAME=<pixiv username here>
 $ export PIXIV_BOT_PASSWORD=<base64 encoded pixiv password here>
-$ python bot.py general 60
+$ python bot.py 60
 ```

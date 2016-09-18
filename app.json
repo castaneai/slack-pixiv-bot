@@ -11,8 +11,8 @@
       "description": "base64-encoded pixiv login password",
       "required": true
     },
-    "PIXIV_BOT_SLACK_API_TOKEN": {
-      "description": "slack api token",
+    "PIXIV_BOT_SLACK_INCOMING_HOOK_URL": {
+      "description": "slack incoming hook url",
       "required": true
     }
   }

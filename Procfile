@@ -1,1 +1,1 @@
-worker: python bot.py pixiv_test 600
+worker: python bot.py 600
