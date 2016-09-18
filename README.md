@@ -1,5 +1,7 @@
 slack-pixiv-bot
 ==================
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+
 A Slack bot to post new works by following users.
 
 ## Requirements
